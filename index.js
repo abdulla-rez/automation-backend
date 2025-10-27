@@ -5,18 +5,18 @@ import path from "path";
 import cron from "node-cron";
 
 const app = express();
-
-// ✅ Keeps Render happy
 app.get("/", (req, res) => res.send("Automation service is running"));
 app.listen(process.env.PORT || 3000, () =>
-  console.log("🌐 Dummy server started on port", process.env.PORT || 3000)
+  console.log("🌐 Server started on port", process.env.PORT || 3000)
 );
 
-// ----------------------------------------------------
-// 🔽 Your existing automation code
-// ----------------------------------------------------
+// ----------------------------------------------------------------
 const DOWNLOADS_PATH = path.resolve("/tmp/downloads");
 if (!fs.existsSync(DOWNLOADS_PATH)) fs.mkdirSync(DOWNLOADS_PATH, { recursive: true });
+
+// Environment-based frontend URLs
+const APP_A_URL =  "https://automation-frontend-1.onrender.com";
+const APP_B_URL =  "https://automation-frontend-2.onrender.com";
 
 async function runAutomation() {
   try {
@@ -26,11 +26,14 @@ async function runAutomation() {
 
     console.log("\n🕒 Starting automation at:", new Date().toLocaleTimeString());
 
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
     const context = await browser.newContext({ acceptDownloads: true });
     const page = await context.newPage();
 
-    await page.goto("http://localhost:5173");
+    await page.goto(APP_A_URL);
     const [download] = await Promise.all([
       page.waitForEvent("download"),
       page.click("#downloadExcelButton"),
@@ -39,7 +42,7 @@ async function runAutomation() {
     console.log("✅ Downloaded:", FULL_FILE_PATH);
 
     const page2 = await context.newPage();
-    await page2.goto("http://localhost:5174");
+    await page2.goto(APP_B_URL);
     const fileInput = await page2.$("input[type='file']");
     await fileInput.setInputFiles(FULL_FILE_PATH);
     console.log("✅ Uploaded file to App B");
@@ -51,6 +54,5 @@ async function runAutomation() {
   }
 }
 
-// Run every 10 s
 cron.schedule("*/10 * * * * *", runAutomation);
 console.log("🚀 Automation running every 10 seconds…");
